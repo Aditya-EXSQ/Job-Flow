@@ -1,7 +1,7 @@
 import asyncio
 import logging
 from typing import List, Dict, Type
-from scraper.core.browser import BrowserManager
+from scraper.browser.manager import BrowserManager
 from scraper.adapters.base import JobPortalAdapter
 from scraper.adapters.indeed import IndeedAdapter
 from scraper.core.models import Job
