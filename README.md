@@ -7,7 +7,7 @@ A Python-based job scraping tool that automates discovery and extraction of job 
 - **Stealth Browser Automation**: Playwright with anti-detection measures (user-agent rotation, webdriver masking, plugin spoofing)
 - **Multi-Layer Extraction**: JSON-LD structured data → embedded JSON → CSS selectors
 - **Resilient Scraping**: Exponential backoff retries, rate limiting, bot detection handling
-- **Proxy Support**: ScrapeOps proxy integration for IP rotation
+- **Proxy Support**: Multiple proxy providers (ScraperAPI, ScrapeOps, generic HTTP/SOCKS) with easy switching
 - **Modular Architecture**: Clean separation of concerns with adapter pattern for multiple job portals
 
 ## Architecture
@@ -122,11 +122,67 @@ All settings are in `scraper/config/settings.py` and can be overridden via `.env
 | Setting | Default | Description |
 |---------|---------|-------------|
 | `HEADLESS` | `False` | Run browser in headless mode |
+| `PROXY_PROVIDER` | `none` | Proxy provider: `none`, `scrapeops`, `scraperapi`, `generic` |
 | `MAX_CONCURRENT_PAGES` | `5` | Max concurrent job detail tabs |
 | `MAX_CONCURRENT_SERP` | `1` | Max concurrent search result pages |
 | `MAX_RETRIES` | `3` | Retry attempts on failure |
 | `NAVIGATION_TIMEOUT` | `30000` | Page load timeout (ms) |
-| `SCRAPEOPS_API_KEY` | - | ScrapeOps proxy API key |
+
+### Proxy Configuration
+
+Job-Flow supports multiple proxy providers to help bypass rate limits and anti-scraping measures. Switch between providers by changing the `PROXY_PROVIDER` environment variable.
+
+**Supported Providers:**
+
+| Provider | Type | Setup |
+|----------|------|-------|
+| `none` | No proxy | Default, no configuration needed |
+| `scraperapi` | Premium | Requires API key from [scraperapi.com](https://www.scraperapi.com/) |
+| `scrapeops` | Premium | Requires API key from [scrapeops.io](https://scrapeops.io/) |
+| `generic` | Any HTTP/SOCKS | Works with free proxy lists or custom proxies |
+
+**Quick Setup Examples:**
+
+```bash
+# Use ScraperAPI (recommended)
+PROXY_PROVIDER=scraperapi
+SCRAPERAPI_API_KEY=your_api_key_here
+
+# Use ScrapeOps
+PROXY_PROVIDER=scrapeops
+SCRAPEOPS_API_KEY=your_api_key_here
+
+# Use a free/custom proxy
+PROXY_PROVIDER=generic
+PROXY_SERVER=http://proxy.example.com:8080
+PROXY_USERNAME=optional_username  # if authentication required
+PROXY_PASSWORD=optional_password
+
+# Disable proxy
+PROXY_PROVIDER=none
+```
+
+**Adding Custom Providers:**
+
+Create a new provider class in `scraper/browser/proxy.py`:
+
+```python
+class MyProxyProvider(ProxyProvider):
+    def get_config(self) -> Optional[Dict[str, str]]:
+        return {
+            "server": "http://my-proxy.com:8080",
+            "username": "user",
+            "password": settings.MY_PROXY_API_KEY,
+        }
+    
+    def get_name(self) -> str:
+        return "My Proxy"
+
+# Register in PROXY_PROVIDERS dict
+PROXY_PROVIDERS["myproxy"] = MyProxyProvider
+```
+
+See `.env.example` for all configuration options.
 
 ## How It Works
 
@@ -195,7 +251,8 @@ To add support for a new job portal:
 ## Troubleshooting
 
 **Bot Detection**: Indeed may block requests. Solutions:
-- Use `SCRAPEOPS_API_KEY` for proxy rotation
+- Configure a proxy provider (see Proxy Configuration section)
+- Use `PROXY_PROVIDER=scraperapi` or `PROXY_PROVIDER=scrapeops` for best results
 - Reduce `MAX_CONCURRENT_PAGES` to 1
 - Increase delays in `rate_limit.py`
 

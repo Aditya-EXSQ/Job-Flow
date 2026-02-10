@@ -5,6 +5,7 @@ from pydantic_settings import BaseSettings
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
+
 class Settings(BaseSettings):
     class Config:
         env_file = BASE_DIR / ".env"
@@ -37,6 +38,20 @@ class Settings(BaseSettings):
     SELECTOR_TIMEOUT: int = 10000  # ms
 
     # Proxies
-    SCRAPEOPS_API_KEY: str = os.getenv("SCRAPEOPS_API_KEY")
+    PROXY_PROVIDER: str = os.getenv(
+        "PROXY_PROVIDER", "none"
+    )  # none, scrapeops, scraperapi, generic
+
+    # Provider-specific settings
+    SCRAPEOPS_API_KEY: str = os.getenv("SCRAPEOPS_API_KEY", "")
+    SCRAPERAPI_API_KEY: str = os.getenv("SCRAPERAPI_API_KEY", "")
+
+    # Generic proxy settings (for free proxy services or custom proxies)
+    PROXY_SERVER: str = os.getenv(
+        "PROXY_SERVER", ""
+    )  # e.g., http://proxy.example.com:8080
+    PROXY_USERNAME: str = os.getenv("PROXY_USERNAME", "")
+    PROXY_PASSWORD: str = os.getenv("PROXY_PASSWORD", "")
+
 
 settings = Settings()
