@@ -352,6 +352,11 @@ class IndeedAdapter(JobPortalAdapter):
         Returns:
             List of successfully scraped Job objects
         """
+        # Force concurrency to 1 if using ScrapeOps to avoid hitting plan limits
+        if settings.SCRAPEOPS_API_KEY and max_concurrent > 1:
+            logger.info("ScrapeOps proxy detected: Forcing max_concurrent to 1 to respect rate limits")
+            max_concurrent = 1
+
         jobs: List[Job] = []
         total = len(job_urls)
         
@@ -381,6 +386,9 @@ class IndeedAdapter(JobPortalAdapter):
                     logger.info(f"Loading: {url}")
                     await page.goto(url, wait_until="domcontentloaded", timeout=settings.NAVIGATION_TIMEOUT)
                     await page.wait_for_timeout(1000)  # Let page settle
+
+                    # Scroll to bottom to ensure full content loading (user requested)
+                    await self._scroll_to_load_all_jobs(page)
                 except Exception as e:
                     logger.error(f"Failed to navigate to {url}: {e}")
             

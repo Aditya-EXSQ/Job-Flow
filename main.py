@@ -1,5 +1,5 @@
 def main():
-    print("Hello from job-scraper!")
+    print("Hello from job-flow!")
 
 
 if __name__ == "__main__":
