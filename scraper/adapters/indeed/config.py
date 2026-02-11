@@ -3,8 +3,8 @@ Indeed-specific constants and configuration.
 """
 
 # Base URLs
-BASE_URL = "https://www.indeed.com"
-SEARCH_URL = "https://www.indeed.com/jobs"
+BASE_URL = "https://in.indeed.com"
+SEARCH_URL = "https://in.indeed.com/jobs"
 
 # Pagination
 MAX_PAGES = 5  # Limit pagination to avoid infinite loops

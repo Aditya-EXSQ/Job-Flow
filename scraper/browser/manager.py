@@ -8,8 +8,8 @@ from playwright.async_api import (
     Playwright,
 )
 from scraper.browser.user_agent import UserAgentProvider
-from scraper.browser.browser_factory import create_browser
-from scraper.browser.context_factory import create_context
+from scraper.browser.launch import create_browser
+from scraper.browser.context import create_context
 from scraper.browser.tabs import create_tab
 
 logger = logging.getLogger(__name__)

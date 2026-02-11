@@ -4,6 +4,7 @@ Handles SERP navigation, scrolling, bot detection, deduplication, and pagination
 """
 
 import logging
+import random
 from typing import List, Set
 from playwright.async_api import Page
 
@@ -11,13 +12,15 @@ from scraper.config.settings import settings
 from scraper.core.rate_limit import with_retry, serp_limiter
 from scraper.adapters.indeed.config import BASE_URL, MAX_PAGES, JOBS_PER_PAGE
 from scraper.adapters.indeed.pagination import build_serp_url
+from scraper.browser.human_input import move_cursor_to_element, human_type
 from scraper.adapters.indeed.selectors import (
     CAPTCHA_SELECTORS,
     BLOCKING_KEYWORDS,
     JOB_CARDS_CONTAINER_SELECTOR,
+    WHAT_INPUT_SELECTOR,
+    WHERE_INPUT_SELECTOR,
+    FIND_JOBS_BUTTON_SELECTOR,
 )
-from scraper.adapters.indeed.extraction.mosaic import extract_mosaic_data
-from scraper.adapters.indeed.extraction.dom import extract_jobs_from_dom
 
 logger = logging.getLogger(__name__)
 
@@ -62,20 +65,30 @@ async def scroll_to_load_all_jobs(page: Page) -> None:
         previous_height = await page.evaluate("document.body.scrollHeight")
 
         # Scroll in steps to simulate human behavior and trigger lazy loading
-        scroll_step = 300  # pixels per scroll
-        scroll_pause = 0.3  # seconds between scrolls
-
+        # RANDOMIZED SCROLLING BEHAVIOR
         current_position = 0
         max_scrolls = 50  # Safety limit to prevent infinite scrolling
         scrolls_done = 0
 
         while scrolls_done < max_scrolls:
-            # Scroll down by scroll_step pixels
-            current_position += scroll_step
+            # Randomize scroll step (between 250 and 550 pixels)
+            step = random.randint(250, 550)
+            current_position += step
+
             await page.evaluate(f"window.scrollTo(0, {current_position})")
 
-            # Wait for content to load
-            await page.wait_for_timeout(int(scroll_pause * 1000))
+            # Randomize pause (between 0.4 and 1.2 seconds)
+            pause_ms = random.randint(2000, 9200)
+            await page.wait_for_timeout(pause_ms)
+
+            # Occasionally scroll up a tiny bit to look human
+            if random.random() < 0.2:
+                scroll_up = random.randint(50, 150)
+                current_position = max(0, current_position - scroll_up)
+                await page.evaluate(f"window.scrollTo(0, {current_position})")
+                await page.wait_for_timeout(random.randint(200, 500))
+
+            scrolls_done += 1
 
             # Check if we've reached the bottom
             current_height = await page.evaluate("document.body.scrollHeight")
@@ -111,26 +124,59 @@ async def scroll_to_load_all_jobs(page: Page) -> None:
 @with_retry()
 async def discover_jobs(
     context, query: str, location: str, seen_jks: Set[str]
-) -> List[str]:
+) -> List[dict]:
     """
-    Discover job URLs from Indeed SERP with pagination support.
-    Extracts from embedded JSON first, falls back to DOM selectors.
+    Discover jobs from Indeed SERP by clicking on job titles and extracting descriptions.
+    Instead of opening multiple tabs, we click each job title and extract the description
+    that appears in the right pane.
     """
-    job_urls: List[str] = []
+    jobs_data: List[dict] = []
     page_num = 0
 
     async with serp_limiter:
         page = await context.new_page()
         try:
-            while page_num < MAX_PAGES:
-                url = build_serp_url(query, location, page_num, JOBS_PER_PAGE)
+            # Navigate to homepage and perform search
+            logger.info(f"Navigating to Indeed homepage: {BASE_URL}")
+            await page.goto(
+                BASE_URL,
+                wait_until="domcontentloaded",
+                timeout=settings.NAVIGATION_TIMEOUT,
+            )
 
-                logger.info(f"Navigating to SERP page {page_num + 1}: {url}")
-                await page.goto(
-                    url,
-                    wait_until="domcontentloaded",
-                    timeout=settings.NAVIGATION_TIMEOUT,
+            # Perform search as a human would — cursor + typing
+            logger.info(f"Performing search for '{query}' in '{location}'")
+
+            await move_cursor_to_element(page, WHAT_INPUT_SELECTOR)
+            await human_type(page, WHAT_INPUT_SELECTOR, query)
+
+            await move_cursor_to_element(page, WHERE_INPUT_SELECTOR)
+            await human_type(page, WHERE_INPUT_SELECTOR, location)
+
+            await move_cursor_to_element(page, FIND_JOBS_BUTTON_SELECTOR)
+
+            # Wait for results to load
+            try:
+                await page.wait_for_selector(
+                    JOB_CARDS_CONTAINER_SELECTOR, timeout=settings.NAVIGATION_TIMEOUT
                 )
+            except Exception:
+                logger.warning(
+                    "Job cards container not found immediately after search."
+                )
+
+            while page_num < MAX_PAGES:
+                # If we are past the first page, navigate explicitly
+                # For the first page (page_num=0), we are already there from the search
+                if page_num > 0:
+                    url = build_serp_url(query, location, page_num, JOBS_PER_PAGE)
+
+                    logger.info(f"Navigating to SERP page {page_num + 1}: {url}")
+                    await page.goto(
+                        url,
+                        wait_until="domcontentloaded",
+                        timeout=settings.NAVIGATION_TIMEOUT,
+                    )
 
                 # Check for bot detection
                 if await detect_bot_challenge(page):
@@ -142,31 +188,10 @@ async def discover_jobs(
                 # Scroll to load all jobs before extraction
                 await scroll_to_load_all_jobs(page)
 
-                # Try extracting from mosaic JSON first
-                job_cards = await extract_mosaic_data(page)
-                new_jobs_found = 0
-
-                if job_cards:
-                    # Use JSON data
-                    for card in job_cards:
-                        jk = card.get("jobkey")
-                        if jk and jk not in seen_jks:
-                            seen_jks.add(jk)
-                            job_url = f"{BASE_URL}/viewjob?jk={jk}"
-                            job_urls.append(job_url)
-                            new_jobs_found += 1
-                else:
-                    # Fallback to DOM extraction
-                    logger.info("Mosaic JSON not found, using DOM fallback")
-                    jobs = await extract_jobs_from_dom(page)
-                    for job in jobs:
-                        jk = job.get("id")
-                        if jk and jk not in seen_jks:
-                            seen_jks.add(jk)
-                            # Use the URL from the card if available
-                            job_url = job.get("url", f"{BASE_URL}/viewjob?jk={jk}")
-                            job_urls.append(job_url)
-                            new_jobs_found += 1
+                # Extract job descriptions by clicking on each job title
+                new_jobs_found = await extract_jobs_by_clicking(
+                    page, seen_jks, jobs_data
+                )
 
                 # Stop pagination if no new jobs found
                 if new_jobs_found == 0:
@@ -181,5 +206,108 @@ async def discover_jobs(
         finally:
             await page.close()
 
-    logger.info(f"Discovery complete: {len(job_urls)} total jobs found")
-    return job_urls
+    logger.info(f"Discovery complete: {len(jobs_data)} total jobs found")
+    return jobs_data
+
+
+async def extract_jobs_by_clicking(
+    page: Page, seen_jks: Set[str], jobs_data: List[dict]
+) -> int:
+    """
+    Click on each job title and extract the job description from the right pane.
+    Returns the number of new jobs found.
+    """
+    new_jobs_count = 0
+
+    try:
+        # Find all job card elements - we need to get a fresh list each time
+        # as clicking can modify the DOM
+        job_card_selector = "div.job_seen_beacon"  # Common selector for job cards
+
+        # Get the total count of job cards
+        job_cards_count = await page.locator(job_card_selector).count()
+        logger.info(f"Found {job_cards_count} job cards on the page")
+
+        # Iterate through each job card by index
+        for index in range(job_cards_count):
+            try:
+                # Re-query the job cards to get fresh elements (DOM may have changed)
+                job_cards = page.locator(job_card_selector)
+                job_card = job_cards.nth(index)
+
+                # Extract the job key from the job card (data-jk attribute)
+                jk = await job_card.get_attribute("data-jk")
+
+                if not jk or jk in seen_jks:
+                    logger.debug(f"Skipping job {index}: already seen or no jobkey")
+                    continue
+
+                # Find the clickable job title within this card
+                # Common selectors for job titles
+                title_selectors = [
+                    "h2.jobTitle a",
+                    "a.jcs-JobTitle",
+                    "h2 a[id^='job_']",
+                ]
+
+                title_element = None
+                for selector in title_selectors:
+                    title_locator = job_card.locator(selector)
+                    if await title_locator.count() > 0:
+                        title_element = title_locator.first
+                        break
+
+                if not title_element:
+                    logger.warning(f"Could not find title element for job {index}")
+                    continue
+
+                # Get the job title text before clicking
+                job_title = await title_element.text_content()
+                logger.info(
+                    f"Clicking on job {index + 1}/{job_cards_count}: {job_title}"
+                )
+
+                # Click on the job title
+                await title_element.click()
+
+                # Wait for the job description to load in the right pane
+                try:
+                    await page.wait_for_selector(
+                        "#jobDescriptionText", timeout=5000, state="visible"
+                    )
+
+                    # Add a small delay for content to fully render
+                    await page.wait_for_timeout(random.randint(500, 1000))
+
+                    # Extract the job description
+                    description_element = page.locator("#jobDescriptionText")
+                    description = await description_element.inner_text()
+
+                    # Store the job data
+                    job_data = {
+                        "jobkey": jk,
+                        "title": job_title.strip() if job_title else "",
+                        "description": description.strip() if description else "",
+                    }
+
+                    jobs_data.append(job_data)
+                    seen_jks.add(jk)
+                    new_jobs_count += 1
+
+                    logger.info(f"Successfully extracted job {jk}: {job_title}")
+
+                except Exception as e:
+                    logger.warning(f"Failed to extract description for job {jk}: {e}")
+                    continue
+
+                # Add a small random delay between clicks to appear more human
+                await page.wait_for_timeout(random.randint(300, 800))
+
+            except Exception as e:
+                logger.warning(f"Error processing job card {index}: {e}")
+                continue
+
+    except Exception as e:
+        logger.error(f"Error in extract_jobs_by_clicking: {e}")
+
+    return new_jobs_count

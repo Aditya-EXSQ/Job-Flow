@@ -1,4 +1,3 @@
-import asyncio
 import logging
 from typing import List, Dict, Type
 from scraper.browser.manager import BrowserManager
@@ -45,20 +44,29 @@ class Runner:
                 f"Starting discovery for {portal} (Query: {query}, Location: {location})"
             )
 
-            # Discover jobs
-            job_urls = await adapter.discover_jobs()
-            logger.info(f"Discovered {len(job_urls)} jobs.")
+            # Discover jobs - now returns job data directly from clicking on each job
+            jobs_data = await adapter.discover_jobs()
+            logger.info(f"Discovered {len(jobs_data)} jobs.")
 
-            # Scrape jobs concurrently
-            tasks = [adapter.scrape_job(url) for url in job_urls]
-            results = await asyncio.gather(*tasks, return_exceptions=True)
-
+            # Convert job data dictionaries to Job objects
             jobs: List[Job] = []
-            for res in results:
-                if isinstance(res, Job):
-                    jobs.append(res)
-                elif isinstance(res, Exception):
-                    logger.error(f"Job scraping failed: {res}")
+            for job_dict in jobs_data:
+                try:
+                    # Create Job object from the extracted data
+                    job = Job(
+                        id=job_dict.get("jobkey", "unknown"),
+                        title=job_dict.get("title", "Unknown Title"),
+                        company="Unknown Company",  # Not extracted in discovery
+                        location="Unknown Location",  # Not extracted in discovery
+                        description=job_dict.get("description", ""),
+                        source="indeed",
+                        url=f"https://in.indeed.com/viewjob?jk={job_dict.get('jobkey', '')}",
+                        salary=None,
+                        posted_at=None,
+                    )
+                    jobs.append(job)
+                except Exception as e:
+                    logger.error(f"Failed to create Job object: {e}")
 
             logger.info(f"Successfully scraped {len(jobs)} jobs.")
 

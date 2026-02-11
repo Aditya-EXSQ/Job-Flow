@@ -115,10 +115,11 @@ async def scrape_jobs_batch(
     Returns:
         List of successfully scraped Job objects
     """
-    # Force concurrency to 1 if using ScrapeOps to avoid hitting plan limits
-    if settings.SCRAPEOPS_API_KEY and max_concurrent > 1:
+    # Force concurrency to 1 if using proxy providers with rate limits
+    if (settings.SCRAPEOPS_API_KEY or settings.ZENROWS_API_KEY) and max_concurrent > 1:
+        provider = "ScrapeOps" if settings.SCRAPEOPS_API_KEY else "ZenRows"
         logger.info(
-            "ScrapeOps proxy detected: Forcing max_concurrent to 1 to respect rate limits"
+            f"{provider} proxy detected: Forcing max_concurrent to 1 to respect rate limits"
         )
         max_concurrent = 1
 

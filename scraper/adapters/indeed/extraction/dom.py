@@ -66,7 +66,8 @@ async def extract_jobs_from_dom(page: Page) -> List[Dict[str, str]]:
                     else:
                         job_data["url"] = href
                 else:
-                    job_data["url"] = f"{BASE_URL}/viewjob?jk={job_id}"
+                    # job_data["url"] = f"{BASE_URL}/viewjob?jk={job_id}"
+                    job_data["url"] = f"{BASE_URL}/viewjob?jk={job_id}&from=shareddesktop_copy"
 
                 # Job Title from span with title attribute or link text
                 title_span = card.locator(JOB_TITLE_SPAN_SELECTOR).first

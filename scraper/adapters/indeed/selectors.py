@@ -5,6 +5,11 @@ Centralized here so that selector changes only need to happen in one place.
 
 # --- SERP (Search Results Page) Selectors ---
 
+# Homepage Search Selectors
+WHAT_INPUT_SELECTOR = "#text-input-what"
+WHERE_INPUT_SELECTOR = "#text-input-where"
+FIND_JOBS_BUTTON_SELECTOR = "#jobsearch > div > div.css-1m0ipk7.eu4oa1w0 > button"
+
 # Job card container selectors - tried in order during DOM extraction
 SERP_CARD_SELECTORS = [
     # Deep selector for table-based layout matches user provided structure

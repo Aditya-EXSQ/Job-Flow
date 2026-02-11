@@ -40,6 +40,6 @@ async def create_context(
     )
 
     # Apply stealth scripts to avoid bot detection
-    await apply_stealth_scripts(context, user_agent)
+    # await apply_stealth_scripts(context, user_agent)
 
     return context

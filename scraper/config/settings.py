@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     IGNORE_HTTPS_ERRORS: bool = True
 
     # Rate limiting & Concurrency
-    MAX_CONCURRENT_PAGES: int = 5
+    MAX_CONCURRENT_PAGES: int = 1  # Set to 1 for free proxy plans (ZenRows, etc.)
     MAX_CONCURRENT_SERP: int = 1
 
     # Retries
@@ -34,7 +34,7 @@ class Settings(BaseSettings):
     RETRY_MAX_DELAY: float = 10.0  # seconds
 
     # Timeouts
-    NAVIGATION_TIMEOUT: int = 30000  # ms
+    NAVIGATION_TIMEOUT: int = 100000  # ms
     SELECTOR_TIMEOUT: int = 10000  # ms
 
     # Proxies
@@ -45,10 +45,11 @@ class Settings(BaseSettings):
     # Provider-specific settings
     SCRAPEOPS_API_KEY: str = os.getenv("SCRAPEOPS_API_KEY", "")
     SCRAPERAPI_API_KEY: str = os.getenv("SCRAPERAPI_API_KEY", "")
+    ZENROWS_API_KEY: str = os.getenv("ZENROWS_API_KEY", "")
 
     # Generic proxy settings (for free proxy services or custom proxies)
     PROXY_SERVER: str = os.getenv(
-        "PROXY_SERVER", ""
+        "PROXY_SERVER", "socks5://72.52.131.65:80"
     )  # e.g., http://proxy.example.com:8080
     PROXY_USERNAME: str = os.getenv("PROXY_USERNAME", "")
     PROXY_PASSWORD: str = os.getenv("PROXY_PASSWORD", "")

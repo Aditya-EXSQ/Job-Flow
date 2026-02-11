@@ -43,10 +43,10 @@ class IndeedAdapter(JobPortalAdapter):
         self.location = location
         self.seen_jks: Set[str] = set()
 
-    async def discover_jobs(self) -> List[str]:
+    async def discover_jobs(self) -> List[dict]:
         """
-        Discover job URLs from Indeed SERP with pagination support.
-        Extracts from embedded JSON first, falls back to DOM selectors.
+        Discover jobs from Indeed SERP by clicking on job titles and extracting data.
+        Returns a list of job dictionaries with jobkey, title, and description.
         """
         return await discovery_module.discover_jobs(
             self.context, self.query, self.location, self.seen_jks

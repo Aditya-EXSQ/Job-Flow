@@ -110,12 +110,37 @@ class GenericProxyProvider(ProxyProvider):
         return "Generic Proxy"
 
 
+class ZenRowsProvider(ProxyProvider):
+    """
+    ZenRows proxy provider.
+    Requires ZENROWS_API_KEY environment variable.
+    """
+
+    def get_config(self) -> Optional[Dict[str, str]]:
+        if not settings.ZENROWS_API_KEY:
+            logger.warning("ZENROWS_API_KEY not found. Cannot use ZenRows proxy.")
+            return None
+
+        logger.info("Using ZenRows Proxy with anti-bot protection")
+        # When using with Playwright, don't use js_render=true (Playwright already does this)
+        # Use premium_proxy and antibot for bypassing bot detection
+        return {
+            "server": "http://api.zenrows.com:8001",
+            "username": settings.ZENROWS_API_KEY,
+            "password": "premium_proxy=true&antibot=true",
+        }
+
+    def get_name(self) -> str:
+        return "ZenRows"
+
+
 # Provider registry: maps provider names to their classes
 PROXY_PROVIDERS: Dict[str, type[ProxyProvider]] = {
     "none": NoProxyProvider,
     "scrapeops": ScrapeOpsProvider,
     "scraperapi": ScraperAPIProvider,
     "generic": GenericProxyProvider,
+    "zenrows": ZenRowsProvider,
 }
 
 
@@ -131,6 +156,7 @@ def get_proxy_config() -> Optional[Dict[str, str]]:
         - 'none': No proxy (default)
         - 'scrapeops': ScrapeOps proxy service
         - 'scraperapi': ScraperAPI proxy service
+        - 'zenrows': ZenRows proxy service
         - 'generic': Generic HTTP/SOCKS proxy (requires PROXY_SERVER)
     """
     provider_name = settings.PROXY_PROVIDER.lower()

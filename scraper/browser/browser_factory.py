@@ -7,21 +7,21 @@ logger = logging.getLogger(__name__)
 
 # Browser launch arguments to avoid detection
 LAUNCH_ARGS = [
-    "--disable-blink-features=AutomationControlled",
-    "--disable-dev-shm-usage",
-    "--disable-web-security",
-    "--disable-features=IsolateOrigins,site-per-process",
-    "--no-sandbox",
-    "--disable-setuid-sandbox",
-    "--disable-accelerated-2d-canvas",
-    "--no-first-run",
-    "--no-zygote",
-    "--disable-gpu",
-    "--hide-scrollbars",
-    "--mute-audio",
-    "--disable-background-timer-throttling",
-    "--disable-backgrounding-occluded-windows",
-    "--disable-renderer-backgrounding",
+    #"--disable-blink-features=AutomationControlled",
+    # "--disable-dev-shm-usage",
+    # "--disable-web-security",
+    # "--disable-features=IsolateOrigins,site-per-process",
+    # "--no-sandbox",
+    # "--disable-setuid-sandbox",
+    # "--disable-accelerated-2d-canvas",
+    # "--no-first-run",
+    # "--no-zygote",
+    # "--disable-gpu",
+    # "--hide-scrollbars",
+    # "--mute-audio",
+    # "--disable-background-timer-throttling",
+    # "--disable-backgrounding-occluded-windows",
+    # "--disable-renderer-backgrounding",
 ]
 
 

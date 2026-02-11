@@ -83,6 +83,41 @@ async def apply_stealth_scripts(context: BrowserContext, user_agent: str):
         Object.defineProperty(window.screen, 'availHeight', {{
             get: () => 768
         }});
+
+        // WebGL Vendor/Renderer Spoof
+        const getParameterProxyHandler = {{
+            apply: function(target, thisArg, argumentsList) {{
+                const param = argumentsList[0];
+                // UNMASKED_VENDOR_WEBGL
+                if (param === 37445) {{
+                    return "Intel Inc.";
+                }}
+                // UNMASKED_RENDERER_WEBGL
+                if (param === 37446) {{
+                    return "Intel(R) Iris(R) Xe Graphics";
+                }}
+                return Reflect.apply(target, thisArg, argumentsList);
+            }}
+        }};
+
+        const createElementProxy = new Proxy(document.createElement, {{
+            apply: function(target, thisArg, argumentsList) {{
+                const element = Reflect.apply(target, thisArg, argumentsList);
+                if (argumentsList[0] === 'canvas') {{
+                    element.getContext = new Proxy(element.getContext, {{
+                        apply: function(target, thisArg, argumentsList) {{
+                            const context = Reflect.apply(target, thisArg, argumentsList);
+                            if (context && (argumentsList[0] === 'webgl' || argumentsList[0] === 'experimental-webgl')) {{
+                                context.getParameter = new Proxy(context.getParameter, getParameterProxyHandler);
+                            }}
+                            return context;
+                        }}
+                    }});
+                }}
+                return element;
+            }}
+        }});
+        document.createElement = createElementProxy;
     """)
 
     logger.info("Browser context created with stealth settings.")

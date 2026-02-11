@@ -28,11 +28,7 @@ class UserAgentProvider:
         if cls._ua is None:
             try:
                 # Initialize UserAgent with a fallback to prevent hanging/errors
-                cls._ua = UserAgent(
-                    browsers=["chrome", "firefox", "safari"],
-                    os=["windows", "macos"],
-                    fallback=FALLBACK_UA,
-                )
+                cls._ua = UserAgent(fallback=FALLBACK_UA)
             except Exception as e:
                 logger.warning(
                     f"Failed to initialize fake_useragent, using fallback: {e}"
